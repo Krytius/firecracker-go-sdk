@@ -81,6 +81,9 @@ type JailerConfig struct {
 	// ChrootStrategy will dictate how files are transfered to the root drive.
 	ChrootStrategy HandlersAdapter
 
+	//
+	CGroups []string
+
 	// Stdout specifies the IO writer for STDOUT to use when spawning the jailer.
 	Stdout io.Writer
 	// Stderr specifies the IO writer for STDERR to use when spawning the jailer.
@@ -104,6 +107,7 @@ type JailerCommandBuilder struct {
 	netNS           string
 	daemonize       bool
 	firecrackerArgs []string
+	cGroups         []string
 
 	stdin  io.Reader
 	stdout io.Writer
@@ -136,6 +140,13 @@ func (b JailerCommandBuilder) Args() []string {
 
 	if b.daemonize {
 		args = append(args, "--daemonize")
+	}
+
+	if len(b.cGroups) > 0 {
+		for i := 0; i < len(b.cGroups); i++ {
+			args = append(args, "--cgroup")
+			args = append(args, b.cGroups[i])
+		}
 	}
 
 	if len(b.firecrackerArgs) > 0 {
@@ -208,6 +219,12 @@ func (b JailerCommandBuilder) WithNetNS(path string) JailerCommandBuilder {
 // WithDaemonize will specify whether to set stdio to /dev/null
 func (b JailerCommandBuilder) WithDaemonize(daemonize bool) JailerCommandBuilder {
 	b.daemonize = daemonize
+	return b
+}
+
+// WithCGroup will specifies the resources reserved for vm
+func (b JailerCommandBuilder) WithCGroup(cGroups []string) JailerCommandBuilder {
+	b.cGroups = cGroups
 	return b
 }
 
@@ -317,6 +334,7 @@ func jail(ctx context.Context, m *Machine, cfg *Config) error {
 		WithExecFile(cfg.JailerCfg.ExecFile).
 		WithChrootBaseDir(cfg.JailerCfg.ChrootBaseDir).
 		WithDaemonize(cfg.JailerCfg.Daemonize).
+		WithCGroup(cfg.JailerCfg.CGroups).
 		WithFirecrackerArgs(
 			"--seccomp-level", cfg.SeccompLevel.String(),
 			"--api-sock", machineSocketPath,
